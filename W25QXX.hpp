@@ -68,16 +68,16 @@ public:
         : LibXR::Flash(4 * 1024, 1, LibXR::RawData(nullptr, w25qxx.capacity_)),
           w25qxx_(&w25qxx) {}
 
-    ErrorCode Erase(size_t offset, size_t size) override {
+    LibXR::ErrorCode Erase(size_t offset, size_t size) override {
       return w25qxx_->Erase(offset, size);
     }
 
-    ErrorCode Write(size_t offset, LibXR::ConstRawData data) override {
+    LibXR::ErrorCode Write(size_t offset, LibXR::ConstRawData data) override {
       return w25qxx_->PageProgramAuto(
           offset, reinterpret_cast<const uint8_t *>(data.addr_), data.size_);
     }
 
-    ErrorCode Read(size_t offset, LibXR::RawData data) override {
+    LibXR::ErrorCode Read(size_t offset, LibXR::RawData data) override {
       return w25qxx_->Read(offset, reinterpret_cast<uint8_t *>(data.addr_),
                            data.size_);
     }
@@ -145,7 +145,7 @@ public:
     return true;
   }
 
-  ErrorCode WriteCmd(Command cmd, LibXR::ConstRawData data) {
+  LibXR::ErrorCode WriteCmd(Command cmd, LibXR::ConstRawData data) {
     spi_cs_->Write(false);
     write_buffer_[0] = static_cast<uint8_t>(cmd);
     memcpy(write_buffer_ + 1, data.addr_, data.size_);
@@ -154,7 +154,7 @@ public:
     return ans;
   }
 
-  ErrorCode ReadCmd(Command cmd, LibXR::RawData data) {
+  LibXR::ErrorCode ReadCmd(Command cmd, LibXR::RawData data) {
     spi_cs_->Write(false);
     write_buffer_[0] = static_cast<uint8_t>(cmd);
     auto ans = spi_->ReadAndWrite({read_buffer_, data.size_ + 1},
@@ -164,7 +164,7 @@ public:
     return ans;
   }
 
-  ErrorCode FastRead(uint32_t addr, uint8_t *buf, size_t len) {
+  LibXR::ErrorCode FastRead(uint32_t addr, uint8_t *buf, size_t len) {
     ASSERT(len <= BUFFER_SIZE);
     write_buffer_[0] = static_cast<uint8_t>(Command::FastRead);
     write_buffer_[1] = static_cast<uint8_t>(addr >> 16);
@@ -180,17 +180,17 @@ public:
     return ans;
   }
 
-  ErrorCode Read(uint32_t addr, uint8_t *buf, size_t len) {
+  LibXR::ErrorCode Read(uint32_t addr, uint8_t *buf, size_t len) {
     for (size_t i = 0; i < len; i += BUFFER_SIZE) {
       auto remain = LibXR::min(BUFFER_SIZE, len - i);
       auto ans = FastRead(addr + i, buf + i, remain);
-      if (ans != ErrorCode::OK)
+      if (ans != LibXR::ErrorCode::OK)
         return ans;
     }
-    return ErrorCode::OK;
+    return LibXR::ErrorCode::OK;
   }
 
-  ErrorCode PageProgramAuto(uint32_t addr, const uint8_t *buf, size_t len) {
+  LibXR::ErrorCode PageProgramAuto(uint32_t addr, const uint8_t *buf, size_t len) {
     size_t page_size = 256;
     size_t remain = len;
     size_t offset = 0;
@@ -200,17 +200,17 @@ public:
       size_t write_len = std::min(page_size - page_offset, remain);
 
       auto ans = PageProgram(addr, buf + offset, write_len);
-      if (ans != ErrorCode::OK)
+      if (ans != LibXR::ErrorCode::OK)
         return ans;
 
       addr += write_len;
       offset += write_len;
       remain -= write_len;
     }
-    return ErrorCode::OK;
+    return LibXR::ErrorCode::OK;
   }
 
-  ErrorCode PageProgram(uint32_t addr, const uint8_t *buf, size_t len) {
+  LibXR::ErrorCode PageProgram(uint32_t addr, const uint8_t *buf, size_t len) {
     ASSERT(len <= BUFFER_SIZE);
 
     // 先写使能
@@ -232,7 +232,7 @@ public:
     return ans;
   }
 
-  ErrorCode WriteEnable() {
+  LibXR::ErrorCode WriteEnable() {
     write_buffer_[0] = static_cast<uint8_t>(Command::WriteEnable);
     spi_cs_->Write(false);
     auto ans = spi_->Write({write_buffer_, 1}, spi_op_);
@@ -257,37 +257,37 @@ public:
 
   enum class EraseType { Sector4K, Block32K, Block64K };
 
-  ErrorCode Erase(uint32_t addr, size_t size) {
+  LibXR::ErrorCode Erase(uint32_t addr, size_t size) {
     if ((size % (4 * 1024)) != 0)
-      return ErrorCode::ARG_ERR;
+      return LibXR::ErrorCode::ARG_ERR;
 
     while (size > 0) {
       if ((size >= 64 * 1024) && ((addr % (64 * 1024)) == 0)) {
         auto ans = EraseBlock(addr, EraseType::Block64K);
-        if (ans != ErrorCode::OK)
+        if (ans != LibXR::ErrorCode::OK)
           return ans;
         addr += 64 * 1024;
         size -= 64 * 1024;
       } else if ((size >= 32 * 1024) && ((addr % (32 * 1024)) == 0)) {
         auto ans = EraseBlock(addr, EraseType::Block32K);
-        if (ans != ErrorCode::OK)
+        if (ans != LibXR::ErrorCode::OK)
           return ans;
         addr += 32 * 1024;
         size -= 32 * 1024;
       } else if ((size >= 4 * 1024) && ((addr % (4 * 1024)) == 0)) {
         auto ans = EraseBlock(addr, EraseType::Sector4K);
-        if (ans != ErrorCode::OK)
+        if (ans != LibXR::ErrorCode::OK)
           return ans;
         addr += 4 * 1024;
         size -= 4 * 1024;
       } else {
-        return ErrorCode::ARG_ERR;
+        return LibXR::ErrorCode::ARG_ERR;
       }
     }
-    return ErrorCode::OK;
+    return LibXR::ErrorCode::OK;
   }
 
-  ErrorCode EraseBlock(uint32_t addr, EraseType type) {
+  LibXR::ErrorCode EraseBlock(uint32_t addr, EraseType type) {
     WriteEnable();
     uint32_t timeout = 1000;
     switch (type) {
