@@ -91,31 +91,18 @@ public:
     spi_ = hw.template FindOrExit<LibXR::SPI>({"spi_w25qxx"});
     spi_cs_ = hw.template FindOrExit<LibXR::GPIO>({"spi_w25qxx_cs"});
 
-    spi_->SetConfig({.clock_polarity = LibXR::SPI::ClockPolarity::LOW,
-                     .clock_phase = LibXR::SPI::ClockPhase::EDGE_1});
+    ASSERT(spi_->SetConfig({.clock_polarity = LibXR::SPI::ClockPolarity::HIGH,
+                            .clock_phase = LibXR::SPI::ClockPhase::EDGE_2,
+                            .prescaler = LibXR::SPI::Prescaler::DIV_16}) ==
+           LibXR::ErrorCode::OK);
 
     spi_cs_->SetConfig({.direction = LibXR::GPIO::Direction::OUTPUT_PUSH_PULL,
                         .pull = LibXR::GPIO::Pull::NONE});
     spi_cs_->Write(true);
 
-    auto ans = Init();
-    while (!ans) {
-      XR_LOG_ERROR("W25QXX init failed");
-      LibXR::Thread::Sleep(50);
-      ans = Init();
-    }
-
-    flash_ = new FlashWrapper(*this);
-    db_ = new LibXR::DatabaseRaw<1>(*flash_);
-
-    hw.Register(LibXR::Entry<LibXR::Flash>{*flash_, {"flash"}});
-    hw.Register(LibXR::Entry<LibXR::DatabaseRaw<1>>{*db_, {"database"}});
-  }
-
-  bool Init() {
-    Reset();
+    ASSERT(WriteCmd(Command::Reset, {}) == LibXR::ErrorCode::OK);
     LibXR::Thread::Sleep(5);
-    ReadCmd(Command::ReadJedecId, {&id_[0], 3});
+    ASSERT(ReadCmd(Command::ReadJedecId, {&id_[0], 3}) == LibXR::ErrorCode::OK);
     switch (static_cast<Capacity>(id_[2])) {
     case Capacity::M_2MB:
       capacity_ = 1024 * 1024 * 2;
@@ -139,10 +126,15 @@ public:
       capacity_ = 1024 * 1024 * 128;
       break;
     default:
-      return false;
+      ASSERT(false);
+      break;
     }
 
-    return true;
+    flash_ = new FlashWrapper(*this);
+    db_ = new LibXR::DatabaseRaw<1>(*flash_);
+
+    hw.Register(LibXR::Entry<LibXR::Flash>{*flash_, {"flash"}});
+    hw.Register(LibXR::Entry<LibXR::DatabaseRaw<1>>{*db_, {"database"}});
   }
 
   LibXR::ErrorCode WriteCmd(Command cmd, LibXR::ConstRawData data) {
