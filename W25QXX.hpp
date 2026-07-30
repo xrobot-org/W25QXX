@@ -13,6 +13,9 @@ depends: []
 === END MANIFEST === */
 // clang-format on
 
+#include <algorithm>
+#include <cstring>
+
 #include "app_framework.hpp"
 #include "database.hpp"
 #include "flash.hpp"
@@ -86,6 +89,33 @@ public:
     W25QXX *w25qxx_;
   };
 
+  class FlashWindow : public LibXR::Flash {
+  public:
+    FlashWindow(W25QXX &w25qxx, size_t base, size_t size)
+        : LibXR::Flash(4 * 1024, 1, LibXR::RawData(nullptr, size)),
+          w25qxx_(&w25qxx), base_(base) {}
+
+    LibXR::ErrorCode Erase(size_t offset, size_t size) override {
+      return w25qxx_->Erase(base_ + offset, size);
+    }
+
+    LibXR::ErrorCode Write(size_t offset, LibXR::ConstRawData data) override {
+      return w25qxx_->PageProgramAuto(
+          base_ + offset, reinterpret_cast<const uint8_t *>(data.addr_),
+          data.size_);
+    }
+
+    LibXR::ErrorCode Read(size_t offset, LibXR::RawData data) override {
+      return w25qxx_->Read(base_ + offset,
+                           reinterpret_cast<uint8_t *>(data.addr_),
+                           data.size_);
+    }
+
+  private:
+    W25QXX *w25qxx_;
+    size_t base_;
+  };
+
   W25QXX(LibXR::HardwareContainer &hw, LibXR::ApplicationManager &app) {
     UNUSED(app);
     spi_ = hw.template FindOrExit<LibXR::SPI>({"spi_w25qxx"});
@@ -106,10 +136,18 @@ public:
     }
 
     flash_ = new FlashWrapper(*this);
-    db_ = new LibXR::DatabaseRaw<1>(*flash_);
+    const size_t database_size =
+        capacity_ >= kDatabaseAreaSize ? kDatabaseAreaSize : capacity_;
+    database_flash_ =
+        new FlashWindow(*this, capacity_ - database_size, database_size);
+    db_ = new LibXR::DatabaseRaw<1>(*database_flash_);
 
-    hw.Register(LibXR::Entry<LibXR::Flash>{*flash_, {"flash"}});
-    hw.Register(LibXR::Entry<LibXR::DatabaseRaw<1>>{*db_, {"database"}});
+    hw.Register(LibXR::Entry<LibXR::Flash>{*flash_, {"flash", "w25qxx_flash"}});
+    hw.Register(LibXR::Entry<LibXR::Flash>{
+        *database_flash_, {"database_flash", "w25qxx_database_flash"}});
+    hw.Register(LibXR::Entry<LibXR::DatabaseRaw<1>>{
+        *db_, {"database_raw", "w25qxx_database_raw"}});
+    hw.Register(LibXR::Entry<LibXR::Database>{*db_, {"database", "w25qxx_database"}});
   }
 
   bool Init() {
@@ -326,10 +364,13 @@ public:
   void OnMonitor() override {}
 
 private:
+  static constexpr size_t kDatabaseAreaSize = 128 * 1024;
+
   uint8_t id_[3] = {0};
   size_t capacity_ = 0;
-  LibXR::DatabaseRaw<1> *db_;
-  LibXR::Flash *flash_;
+  LibXR::DatabaseRaw<1> *db_ = nullptr;
+  LibXR::Flash *flash_ = nullptr;
+  LibXR::Flash *database_flash_ = nullptr;
   LibXR::SPI *spi_;
   LibXR::GPIO *spi_cs_;
 
