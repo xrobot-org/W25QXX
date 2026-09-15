@@ -1,5 +1,16 @@
 # W25QXX
 
+## Static assembly source line
+
+This source line uses explicit C++ constructor dependencies and ordered instance
+arguments. Inspect the current primary header with `xrobot_mod_parser --path .`;
+its declarations, not old manifest/config examples, define the interface.
+Historical HardwareContainer/ApplicationManager examples below apply only to the
+older dynamic source tags. Device/protocol descriptions remain relevant.
+See the XRobot [migration guide](https://github.com/xrobot-org/XRobot/blob/dev/MIGRATION.md).
+Compilation is not hardware validation; retain version-specific board evidence.
+
+
 W25QXX FLASH 驱动 / W25QXX Flash Driver
 
 ---
@@ -8,7 +19,7 @@ W25QXX FLASH 驱动 / W25QXX Flash Driver
 
 本模块是基于 LibXR 框架的 W25QXX SPI NOR Flash 驱动，支持 16Mbit ~ 1Gbit 全系列芯片。自动识别容量。
 
-This module implements a flexible W25QXX SPI NOR Flash driver (C++ template), supporting all common capacities. Capacity is auto-detected by JEDEC ID.  
+This module implements a flexible W25QXX SPI NOR Flash driver (C++ template), supporting all common capacities. Capacity is auto-detected by JEDEC ID.
 
 ---
 
