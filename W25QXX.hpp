@@ -124,10 +124,12 @@ class W25QXX
     size_t base_;
   };
 
-  W25QXX(LibXR::SPI& external_spi_w25qxx, LibXR::GPIO& external_spi_w25qxx_cs)
+  W25QXX(
+      LibXR::SPI& spi,
+      LibXR::GPIO& cs)
   {
-    spi_ = std::addressof(external_spi_w25qxx);
-    spi_cs_ = std::addressof(external_spi_w25qxx_cs);
+    spi_ = std::addressof(spi);
+    spi_cs_ = std::addressof(cs);
 
     spi_->SetConfig({.clock_polarity = LibXR::SPI::ClockPolarity::LOW,
                      .clock_phase = LibXR::SPI::ClockPhase::EDGE_1});
