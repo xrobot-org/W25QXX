@@ -394,8 +394,6 @@ class W25QXX
   LibXR::DatabaseRaw<1>& GetDatabaseRaw() { return *db_; }
   LibXR::Database& GetDatabase() { return *db_; }
 
-  void OnMonitor() {}
-
  private:
   static constexpr size_t kDatabaseAreaSize = 128 * 1024;
 
