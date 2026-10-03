@@ -2,7 +2,7 @@
 
 // clang-format off
 /* === MODULE MANIFEST V2 ===
-module_description: W25QXX FLASH 驱动 / W25QXX flash driver
+module_description: Winbond W25Qxx SPI NOR Flash 驱动模块 / Driver module for the Winbond W25Qxx SPI NOR flash
 depends: []
 === END MANIFEST === */
 // clang-format on
