@@ -27,8 +27,9 @@ depends: []
  *        Driver for the Winbond W25Qxx SPI NOR flash; detects the capacity from the
  *        JEDEC ID and provides Flash views and a database.
  *
- * @tparam BUFFER_SIZE SPI 传输缓冲区大小，单位字节，也是单次读取块的大小。
- *                     SPI transfer buffer size in bytes, also the read chunk size.
+ * @tparam BUFFER_SIZE 读缓冲区大小，单位字节，也是单次读取块的大小；写缓冲区容纳一整页。
+ *                     Read buffer size in bytes, also the read chunk size; the write
+ *                     buffer holds one whole page.
  */
 template <unsigned int BUFFER_SIZE = 128>
 class W25QXX
@@ -349,9 +350,9 @@ class W25QXX
   }
 
   /**
-   * @brief 写入任意长度的数据，按 256 字节页边界和 BUFFER_SIZE 拆分后逐段调用 PageProgram。
-   *        Write data of any length, split at 256-byte page boundaries and at
-   *        BUFFER_SIZE, and passed to PageProgram segment by segment.
+   * @brief 写入任意长度的数据，按 256 字节页边界拆分后逐段调用 PageProgram。
+   *        Write data of any length, split at 256-byte page boundaries and passed to
+   *        PageProgram segment by segment.
    *
    * @param addr 写入起始地址。
    *             Start address.
@@ -364,15 +365,14 @@ class W25QXX
    */
   LibXR::ErrorCode PageProgramAuto(uint32_t addr, const uint8_t* buf, size_t len)
   {
-    size_t page_size = 256;
+    size_t page_size = PAGE_SIZE;
     size_t remain = len;
     size_t offset = 0;
 
     while (remain > 0)
     {
       size_t page_offset = addr % page_size;
-      size_t write_len = std::min({page_size - page_offset, remain,
-                                   static_cast<size_t>(BUFFER_SIZE)});
+      size_t write_len = std::min(page_size - page_offset, remain);
 
       auto ans = PageProgram(addr, buf + offset, write_len);
       if (ans != LibXR::ErrorCode::OK) return ans;
@@ -385,9 +385,9 @@ class W25QXX
   }
 
   /**
-   * @brief 页编程：写使能后写入一段数据并等待芯片空闲，len 不超过 BUFFER_SIZE。
+   * @brief 页编程：写使能后写入一段数据并等待芯片空闲，len 不超过一页（256 字节）。
    *        Page program: write enable, write one block and wait until the chip is idle;
-   *        len does not exceed BUFFER_SIZE.
+   *        len does not exceed one page (256 bytes).
    *
    * @param addr 写入起始地址。
    *             Start address.
@@ -401,7 +401,7 @@ class W25QXX
    */
   LibXR::ErrorCode PageProgram(uint32_t addr, const uint8_t* buf, size_t len)
   {
-    ASSERT(len <= BUFFER_SIZE);
+    ASSERT(len <= PAGE_SIZE);
 
     // 先写使能
     auto ans = WriteEnable();
@@ -654,7 +654,11 @@ class W25QXX
   LibXR::SPI* spi_;
   LibXR::GPIO* spi_cs_;
 
-  uint8_t read_buffer_[BUFFER_SIZE + 5], write_buffer_[BUFFER_SIZE + 5];
+  static constexpr size_t PAGE_SIZE = 256;  ///< 页编程的最大长度 Page program size
+  static constexpr size_t WRITE_BUFFER_SIZE =
+      (BUFFER_SIZE > PAGE_SIZE ? BUFFER_SIZE : PAGE_SIZE) + 5;  ///< 命令头 5 字节 5-byte header
+
+  uint8_t read_buffer_[BUFFER_SIZE + 5], write_buffer_[WRITE_BUFFER_SIZE];
 
   LibXR::Semaphore spi_sem_;
   LibXR::SPI::OperationRW spi_op_ = LibXR::SPI::OperationRW(spi_sem_, 32);

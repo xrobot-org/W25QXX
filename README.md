@@ -9,7 +9,7 @@ W25QXX 是基于 LibXR 的 C++ 模板驱动，按 JEDEC ID 自动识别容量，
 - 构造时，W25QXX 把 SPI 设为 CPOL 低、第一边沿采样，把 `cs` 设为推挽输出并拉高，然后复位芯片并读取 JEDEC ID。容量无法识别时打印 `W25QXX init failed` 并每 50 ms 重试，直到成功，构造在此期间保持阻塞。
 - 支持的容量：2 MB（16 Mbit）、4 MB（32 Mbit）、8 MB（64 Mbit）、16 MB（128 Mbit）、32 MB（256 Mbit）、64 MB（512 Mbit）、128 MB（1 Gbit）。
 - 命令使用 3 字节地址，大于 16 MB 的芯片可直接访问前 16 MB。
-- 读使用 Fast Read，按 `BUFFER_SIZE` 分块；写使用页编程，按 256 字节页边界和 `BUFFER_SIZE` 拆分；擦除按地址对齐自动选择 64 KB、32 KB 或 4 KB 块，大小为 4 KB 的整数倍；`ChipErase()` 擦除整片。
+- 读使用 Fast Read，按 `BUFFER_SIZE` 分块；写使用页编程，按 256 字节页边界拆分；擦除按地址对齐自动选择 64 KB、32 KB 或 4 KB 块，大小为 4 KB 的整数倍；`ChipErase()` 擦除整片。
 - SPI 读写共用内部缓冲区，多个线程并发访问同一实例时由调用方加锁。
 
 W25QXX is a LibXR-based C++ template driver. It detects the capacity from the JEDEC ID and provides `LibXR::Flash` views and a `LibXR::DatabaseRaw`.
@@ -17,7 +17,7 @@ W25QXX is a LibXR-based C++ template driver. It detects the capacity from the JE
 - Upon construction, W25QXX sets the SPI bus to CPOL low and first-edge sampling, configures `cs` as a push-pull output driven high, resets the chip and reads the JEDEC ID. If the capacity is not recognized it logs `W25QXX init failed` and retries every 50 ms until it succeeds, and the construction stays blocked meanwhile.
 - Supported capacities: 2 MB (16 Mbit), 4 MB (32 Mbit), 8 MB (64 Mbit), 16 MB (128 Mbit), 32 MB (256 Mbit), 64 MB (512 Mbit), 128 MB (1 Gbit).
 - Commands use 3-byte addresses, so on chips larger than 16 MB the first 16 MB are directly addressable.
-- Reads use Fast Read in chunks of `BUFFER_SIZE`; writes use page program, split at 256-byte page boundaries and at `BUFFER_SIZE`; erase picks 64 KB, 32 KB or 4 KB blocks from the address alignment, with a size that is a multiple of 4 KB; `ChipErase()` erases the whole chip.
+- Reads use Fast Read in chunks of `BUFFER_SIZE`; writes use page program, split at 256-byte page boundaries; erase picks 64 KB, 32 KB or 4 KB blocks from the address alignment, with a size that is a multiple of 4 KB; `ChipErase()` erases the whole chip.
 - SPI transfers share internal buffers, so concurrent access to one instance from several threads is serialized by the caller.
 
 ## 2. 接口 / API
@@ -48,7 +48,7 @@ W25QXX(LibXR::SPI& spi,
 
 模板参数：
 
-- `BUFFER_SIZE`：SPI 传输缓冲区大小，单位字节，也是单次读取块的大小，默认 128。
+- `BUFFER_SIZE`：读缓冲区大小，单位字节，也是单次读取块的大小，默认 128；写缓冲区容纳一整页（256 字节）加命令头。
 
 依赖：
 
@@ -59,7 +59,7 @@ W25QXX(LibXR::SPI& spi,
 
 Template parameter:
 
-- `BUFFER_SIZE`: SPI transfer buffer size in bytes, also the read chunk size, default 128.
+- `BUFFER_SIZE`: read buffer size in bytes, also the read chunk size, default 128; the write buffer holds one whole page (256 bytes) plus the command header.
 
 Dependencies:
 
