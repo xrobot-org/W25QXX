@@ -81,7 +81,7 @@ An instance written by `xrobot instance add xrobot-org/W25QXX` (`template_args` 
 ```yaml
 modules:
   - module: xrobot-org/W25QXX
-    id: w25qxx
+    id: w25qxx_0
     template_args:
       - 128
     args:
