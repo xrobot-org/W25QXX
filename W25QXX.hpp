@@ -461,21 +461,31 @@ class W25QXX
    *              Polling interval in ms.
    * @param timeout 超时时间，单位 ms。
    *                Timeout in ms.
-   * @return 芯片空闲为 OK，超时为 TIMEOUT。
-   *         OK when the chip is idle, TIMEOUT on timeout.
+   * @return 芯片空闲为 OK，超时为 TIMEOUT，读取状态寄存器失败时为该次 SPI 传输的结果。
+   *         OK when the chip is idle, TIMEOUT on timeout, the result of the SPI transfer
+   *         when reading the status register fails.
    */
   LibXR::ErrorCode WaitBusy(uint32_t cycle = 1, uint32_t timeout = 2000)
   {
     auto start = LibXR::Timebase::GetMilliseconds();
-    while (IsBusy())
+    while (true)
     {
+      uint8_t status = 0;
+      auto ans = ReadCmd(Command::ReadStatusReg1, {&status, 1});
+      if (ans != LibXR::ErrorCode::OK)
+      {
+        return ans;
+      }
+      if ((status & 0x01) == 0)
+      {
+        return LibXR::ErrorCode::OK;
+      }
       LibXR::Thread::Sleep(cycle);
       if (LibXR::Timebase::GetMilliseconds() - start > timeout)
       {
         return LibXR::ErrorCode::TIMEOUT;
       }
     }
-    return LibXR::ErrorCode::OK;
   }
 
   /**
