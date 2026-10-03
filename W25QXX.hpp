@@ -349,9 +349,9 @@ class W25QXX
   }
 
   /**
-   * @brief 写入任意长度的数据，按 256 字节页边界拆分后逐段调用 PageProgram。
-   *        Write data of any length, split at 256-byte page boundaries and passed to
-   *        PageProgram segment by segment.
+   * @brief 写入任意长度的数据，按 256 字节页边界和 BUFFER_SIZE 拆分后逐段调用 PageProgram。
+   *        Write data of any length, split at 256-byte page boundaries and at
+   *        BUFFER_SIZE, and passed to PageProgram segment by segment.
    *
    * @param addr 写入起始地址。
    *             Start address.
@@ -371,7 +371,8 @@ class W25QXX
     while (remain > 0)
     {
       size_t page_offset = addr % page_size;
-      size_t write_len = std::min(page_size - page_offset, remain);
+      size_t write_len = std::min({page_size - page_offset, remain,
+                                   static_cast<size_t>(BUFFER_SIZE)});
 
       auto ans = PageProgram(addr, buf + offset, write_len);
       if (ans != LibXR::ErrorCode::OK) return ans;
