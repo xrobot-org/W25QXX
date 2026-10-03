@@ -395,15 +395,17 @@ class W25QXX
    *            Data to write.
    * @param len 数据长度，单位字节。
    *            Length in bytes.
-   * @return SPI 传输的结果。
-   *         Result of the SPI transfer.
+   * @return 成功为 OK；写使能或 SPI 传输失败时为该传输的结果，等待空闲超时为 TIMEOUT。
+   *         OK on success; the result of the write enable or SPI transfer when it
+   *         fails; TIMEOUT when the wait for idle times out.
    */
   LibXR::ErrorCode PageProgram(uint32_t addr, const uint8_t* buf, size_t len)
   {
     ASSERT(len <= BUFFER_SIZE);
 
     // 先写使能
-    WriteEnable();
+    auto ans = WriteEnable();
+    if (ans != LibXR::ErrorCode::OK) return ans;
 
     // 构建写指令
     write_buffer_[0] = static_cast<uint8_t>(Command::PageProgram);
@@ -413,12 +415,11 @@ class W25QXX
     memcpy(write_buffer_ + 4, buf, len);
 
     spi_cs_->Write(false);
-    auto ans = spi_->Write({write_buffer_, len + 4}, spi_op_);
+    ans = spi_->Write({write_buffer_, len + 4}, spi_op_);
     spi_cs_->Write(true);
+    if (ans != LibXR::ErrorCode::OK) return ans;
 
-    WaitBusy(1, 10);
-
-    return ans;
+    return WaitBusy(1, 10);
   }
 
   /**
@@ -460,15 +461,21 @@ class W25QXX
    *              Polling interval in ms.
    * @param timeout 超时时间，单位 ms。
    *                Timeout in ms.
+   * @return 芯片空闲为 OK，超时为 TIMEOUT。
+   *         OK when the chip is idle, TIMEOUT on timeout.
    */
-  void WaitBusy(uint32_t cycle = 1, uint32_t timeout = 2000)
+  LibXR::ErrorCode WaitBusy(uint32_t cycle = 1, uint32_t timeout = 2000)
   {
     auto start = LibXR::Timebase::GetMilliseconds();
     while (IsBusy())
     {
       LibXR::Thread::Sleep(cycle);
-      if (LibXR::Timebase::GetMilliseconds() - start > timeout) return;
+      if (LibXR::Timebase::GetMilliseconds() - start > timeout)
+      {
+        return LibXR::ErrorCode::TIMEOUT;
+      }
     }
+    return LibXR::ErrorCode::OK;
   }
 
   /**
@@ -537,12 +544,14 @@ class W25QXX
    *             Start address of the block.
    * @param type 块的大小。
    *             Block size.
-   * @return SPI 传输的结果。
-   *         Result of the SPI transfer.
+   * @return 成功为 OK；写使能或 SPI 传输失败时为该传输的结果，等待空闲超时为 TIMEOUT。
+   *         OK on success; the result of the write enable or SPI transfer when it
+   *         fails; TIMEOUT when the wait for idle times out.
    */
   LibXR::ErrorCode EraseBlock(uint32_t addr, EraseType type)
   {
-    WriteEnable();
+    auto ans = WriteEnable();
+    if (ans != LibXR::ErrorCode::OK) return ans;
     uint32_t timeout = 1000;
     switch (type)
     {
@@ -564,10 +573,10 @@ class W25QXX
     write_buffer_[3] = addr & 0xFF;
 
     spi_cs_->Write(false);
-    auto ans = spi_->Write({write_buffer_, 4}, spi_op_);
+    ans = spi_->Write({write_buffer_, 4}, spi_op_);
     spi_cs_->Write(true);
-    WaitBusy(100, timeout);
-    return ans;
+    if (ans != LibXR::ErrorCode::OK) return ans;
+    return WaitBusy(100, timeout);
   }
 
   /**
