@@ -1,56 +1,100 @@
 # W25QXX
 
-W25QXX FLASH 驱动 / W25QXX Flash Driver
+Winbond W25Qxx SPI NOR Flash 驱动模块 / Driver Module for the Winbond W25Qxx SPI NOR flash
 
----
+## 1. 模块作用 / Purpose
 
-## 简介 / Introduction
+W25QXX 是基于 LibXR 的 C++ 模板驱动，按 JEDEC ID 自动识别容量，提供 `LibXR::Flash` 视图和一个 `LibXR::DatabaseRaw`。
 
-本模块是基于 LibXR 框架的 W25QXX SPI NOR Flash 驱动，支持 16Mbit ~ 1Gbit 全系列芯片。自动识别容量。
+- 构造时，W25QXX 把 SPI 设为 CPOL 低、第一边沿采样，把 `cs` 设为推挽输出并拉高，然后复位芯片并读取 JEDEC ID。容量无法识别时打印 `W25QXX init failed` 并每 50 ms 重试，直到成功，构造在此期间保持阻塞。
+- 支持的容量：2 MB（16 Mbit）、4 MB（32 Mbit）、8 MB（64 Mbit）、16 MB（128 Mbit）、32 MB（256 Mbit）、64 MB（512 Mbit）、128 MB（1 Gbit）。
+- 命令使用 3 字节地址，大于 16 MB 的芯片可直接访问前 16 MB。
+- 读使用 Fast Read，按 `BUFFER_SIZE` 分块；写使用页编程，按 256 字节页边界拆分；擦除按地址对齐自动选择 64 KB、32 KB 或 4 KB 块，大小为 4 KB 的整数倍；`ChipErase()` 擦除整片。
+- SPI 读写共用内部缓冲区，多个线程并发访问同一实例时由调用方加锁。
 
-This module implements a flexible W25QXX SPI NOR Flash driver (C++ template), supporting all common capacities. Capacity is auto-detected by JEDEC ID.  
+W25QXX is a LibXR-based C++ template driver. It detects the capacity from the JEDEC ID and provides `LibXR::Flash` views and a `LibXR::DatabaseRaw`.
 
----
+- Upon construction, W25QXX sets the SPI bus to CPOL low and first-edge sampling, configures `cs` as a push-pull output driven high, resets the chip and reads the JEDEC ID. If the capacity is not recognized it logs `W25QXX init failed` and retries every 50 ms until it succeeds, and the construction stays blocked meanwhile.
+- Supported capacities: 2 MB (16 Mbit), 4 MB (32 Mbit), 8 MB (64 Mbit), 16 MB (128 Mbit), 32 MB (256 Mbit), 64 MB (512 Mbit), 128 MB (1 Gbit).
+- Commands use 3-byte addresses, so on chips larger than 16 MB the first 16 MB are directly addressable.
+- Reads use Fast Read in chunks of `BUFFER_SIZE`; writes use page program, split at 256-byte page boundaries; erase picks 64 KB, 32 KB or 4 KB blocks from the address alignment, with a size that is a multiple of 4 KB; `ChipErase()` erases the whole chip.
+- SPI transfers share internal buffers, so concurrent access to one instance from several threads is serialized by the caller.
 
-## 依赖硬件 / Required Hardware
+## 2. 接口 / API
 
-- `spi_w25qxx`：SPI 控制器（硬件 SPI 句柄）
-- `spi_w25qxx_cs`：片选引脚（GPIO 句柄）
+- `LibXR::Flash& GetFlash()`：整片 Flash 视图，最小擦除 4 KB，写粒度 1 字节。
+- `LibXR::Flash& GetDatabaseFlash()`：芯片末尾 128 KB 的窗口，芯片更小时为整片。
+- `LibXR::DatabaseRaw<1>& GetDatabaseRaw()`、`LibXR::Database& GetDatabase()`：建在该窗口上的 Database。
+- 底层操作：`Read()`、`FastRead()`、`PageProgram()`、`PageProgramAuto()`、`Erase()`、`EraseBlock()`、`ChipErase()`、`IsBusy()`、`WaitBusy()`、`Reset()`。
 
----
+需要这些接口的代码通过 `W25QXX<...>&` 获得实例，再调用上述函数。在实例配置中，其他模块的 `LibXR::Database&` 参数可写成成员函数调用，例如 BMI088 的 `database: w25qxx_0.GetDatabase()`。
 
-## 构造参数 / Constructor Arguments
+- `LibXR::Flash& GetFlash()`: whole-chip view, 4 KB minimum erase, 1-byte write granularity.
+- `LibXR::Flash& GetDatabaseFlash()`: window over the last 128 KB of the chip, the whole chip if it is smaller.
+- `LibXR::DatabaseRaw<1>& GetDatabaseRaw()`, `LibXR::Database& GetDatabase()`: the Database built on that window.
+- Low-level operations: `Read()`, `FastRead()`, `PageProgram()`, `PageProgramAuto()`, `Erase()`, `EraseBlock()`, `ChipErase()`, `IsBusy()`, `WaitBusy()`, `Reset()`.
 
-- 无 None
+Code that needs these interfaces takes the `W25QXX<...>&` instance and calls the functions above. In an instance configuration, a `LibXR::Database&` argument of another Module can be written as a member call, for example `database: w25qxx_0.GetDatabase()` for BMI088.
 
----
+## 3. 构造接口 / Constructor
 
-## 模板参数 / Template Arguments
+```cpp
+template <unsigned int BUFFER_SIZE = 128>
+class W25QXX;
 
-- `BUFFER_SIZE`（默认 128）：操作缓冲区大小。默认值足以覆盖绝大多数用例，建议与主芯片 RAM 能力匹配。
-  - `W25QXX<256> flash(hw, app_mgr);`
+W25QXX(LibXR::SPI& spi,
+       LibXR::GPIO& cs);
+```
 
----
+模板参数：
 
-## 依赖模块 / Depends
+- `BUFFER_SIZE`：读缓冲区大小，单位字节，也是单次读取块的大小，默认 128；写缓冲区容纳一整页（256 字节）加命令头。
 
-- 无 None
+依赖：
 
----
+- `spi`：连接 Flash 的 `LibXR::SPI`。
+- `cs`：片选 GPIO，低电平有效。
 
-## 支持容量 / Supported Capacity
+配置参数：无。
 
-- 2MB (16Mbit), 4MB (32Mbit), 8MB (64Mbit), 16MB (128Mbit), 32MB (256Mbit), 64MB (512Mbit), 128MB (1Gbit)
+Template parameter:
 
----
+- `BUFFER_SIZE`: read buffer size in bytes, also the read chunk size, default 128; the write buffer holds one whole page (256 bytes) plus the command header.
 
-## 特性 / Features
+Dependencies:
 
-- 支持 Winbond W25Qxx 所有主流 SPI Flash 型号
-- JEDEC ID 自动容量识别
-- 支持页编程、4K/32K/64K 擦除和整片擦除
-- 线程安全的 SPI 操作（带信号量）
-- 数据库封装：自动注册为"database" (LibXR::DatabaseRaw)
-- 可配置缓冲区大小
-- 快速读、状态寄存器访问、掉电/唤醒/复位
-- 易于集成，接口与 LibXR::Flash/Database 兼容
+- `spi`: the `LibXR::SPI` bus of the flash.
+- `cs`: the chip-select GPIO, active low.
+
+Configuration parameters: none.
+
+## 4. Topic
+
+无 / None
+
+## 5. 配置示例 / Configuration Example
+
+`xrobot instance add xrobot-org/W25QXX` 写入的实例（`template_args` 为 `BUFFER_SIZE` 的默认值），`spi` 与 `cs` 填写为 BSP 通过 `XR_REGISTER`（硬件注册）注册的名称：
+
+An instance written by `xrobot instance add xrobot-org/W25QXX` (`template_args` holds the default `BUFFER_SIZE`), with `spi` and `cs` set to names registered by the BSP with `XR_REGISTER` (Registration):
+
+```yaml
+modules:
+  - module: xrobot-org/W25QXX
+    id: w25qxx_0
+    template_args:
+      - 128
+    args:
+      - spi: spi2
+      - cs: flash_cs
+```
+
+## 6. 依赖与硬件 / Dependencies and Hardware
+
+依赖：LibXR。
+
+硬件：一片 Winbond W25Qxx SPI NOR Flash（2 MB 到 128 MB），通过 SPI 连接，片选使用一个输出 GPIO。SPI 驱动的收发缓冲区须容纳单次传输：读取为 `BUFFER_SIZE + 5` 字节（默认 133），页编程为 260 字节。CodeGenerator 生成的 STM32 工程中 SPI 缓冲区默认 32 字节，在其配置的 `SPI.<实例>.tx_buffer_size`、`rx_buffer_size` 中调整。
+
+Dependencies: LibXR.
+
+Hardware: one Winbond W25Qxx SPI NOR flash (2 MB to 128 MB) on SPI, with one output GPIO as chip select. The SPI driver's TX and RX buffers must hold one transfer: `BUFFER_SIZE + 5` bytes for a read (133 by default) and 260 bytes for a page program. STM32 projects generated by CodeGenerator use 32-byte SPI buffers by default; set `SPI.<instance>.tx_buffer_size` and `rx_buffer_size` in its configuration.
