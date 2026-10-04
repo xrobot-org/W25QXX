@@ -1,6 +1,6 @@
 # W25QXX
 
-Winbond W25Qxx SPI NOR Flash 驱动模块 / Driver module for the Winbond W25Qxx SPI NOR flash
+Winbond W25Qxx SPI NOR Flash 驱动模块 / Driver Module for the Winbond W25Qxx SPI NOR flash
 
 ## 1. 模块作用 / Purpose
 
@@ -24,14 +24,14 @@ W25QXX is a LibXR-based C++ template driver. It detects the capacity from the JE
 
 - `LibXR::Flash& GetFlash()`：整片 Flash 视图，最小擦除 4 KB，写粒度 1 字节。
 - `LibXR::Flash& GetDatabaseFlash()`：芯片末尾 128 KB 的窗口，芯片更小时为整片。
-- `LibXR::DatabaseRaw<1>& GetDatabaseRaw()`、`LibXR::Database& GetDatabase()`：建在该窗口上的数据库。
+- `LibXR::DatabaseRaw<1>& GetDatabaseRaw()`、`LibXR::Database& GetDatabase()`：建在该窗口上的 Database。
 - 底层操作：`Read()`、`FastRead()`、`PageProgram()`、`PageProgramAuto()`、`Erase()`、`EraseBlock()`、`ChipErase()`、`IsBusy()`、`WaitBusy()`、`Reset()`。
 
 需要这些接口的代码通过 `W25QXX<...>&` 获得实例，再调用上述函数。在实例配置中，其他模块的 `LibXR::Database&` 参数可写成成员函数调用，例如 BMI088 的 `database: w25qxx_0.GetDatabase()`。
 
 - `LibXR::Flash& GetFlash()`: whole-chip view, 4 KB minimum erase, 1-byte write granularity.
 - `LibXR::Flash& GetDatabaseFlash()`: window over the last 128 KB of the chip, the whole chip if it is smaller.
-- `LibXR::DatabaseRaw<1>& GetDatabaseRaw()`, `LibXR::Database& GetDatabase()`: the database built on that window.
+- `LibXR::DatabaseRaw<1>& GetDatabaseRaw()`, `LibXR::Database& GetDatabase()`: the Database built on that window.
 - Low-level operations: `Read()`, `FastRead()`, `PageProgram()`, `PageProgramAuto()`, `Erase()`, `EraseBlock()`, `ChipErase()`, `IsBusy()`, `WaitBusy()`, `Reset()`.
 
 Code that needs these interfaces takes the `W25QXX<...>&` instance and calls the functions above. In an instance configuration, a `LibXR::Database&` argument of another Module can be written as a member call, for example `database: w25qxx_0.GetDatabase()` for BMI088.
@@ -76,7 +76,7 @@ Configuration parameters: none.
 
 `xrobot instance add xrobot-org/W25QXX` 写入的实例（`template_args` 为 `BUFFER_SIZE` 的默认值），`spi` 与 `cs` 填写为 BSP 通过 `XR_REGISTER`（硬件注册）注册的名称：
 
-An instance written by `xrobot instance add xrobot-org/W25QXX` (`template_args` holds the default `BUFFER_SIZE`), with `spi` and `cs` set to names registered by the BSP's `XR_REGISTER` (Registration):
+An instance written by `xrobot instance add xrobot-org/W25QXX` (`template_args` holds the default `BUFFER_SIZE`), with `spi` and `cs` set to names registered by the BSP with `XR_REGISTER` (Registration):
 
 ```yaml
 modules:
